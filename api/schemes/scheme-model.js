@@ -33,8 +33,17 @@ async function findById(scheme_id) { // EXERCISE B
   .orderBy('st.step_number', 'asc')
   .select('sc.scheme_name', 'st.*')
   .where('sc.scheme_id', scheme_id)
-  //GO TO 4B
-  return rows
+
+  let result = rows.reduce((acc,row) => {
+    if(row.instructions){
+      acc.steps.push({step_id: row.step_id, instructions: row.instructions, step_number: row.step_number})
+    }else{
+      acc.scheme_id = scheme_id //scheme_id was null??
+    }
+    return acc
+  }, {scheme_id: rows[0].scheme_id, scheme_name: rows[0].scheme_name, steps: []})//second parameter is where reduce function will start
+  
+  return result
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -102,8 +111,27 @@ async function findById(scheme_id) { // EXERCISE B
   */
 }
 
-function findSteps(scheme_id) { // EXERCISE C
+async function findSteps(scheme_id) { // EXERCISE C
+  const rows = await db('schemes as sc')
+    .join('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .orderBy('st.step_number' , 'asc')
+    .select('sc.scheme_name', 'st.step_id', 'st.step_number', 'st.instructions')
+    .where('sc.scheme_id', scheme_id)
+
+    return rows
   /*
+
+ SELECT
+          sc.scheme_name,
+          st.step_id,
+          st.step_number,
+          st.instructions
+      FROM schemes as sc
+      JOIN steps as st
+          ON sc.scheme_id = st.scheme_id
+      WHERE sc.scheme_id = 1
+      ORDER BY st.step_number ASC;
+
     1C- Build a query in Knex that returns the following data.
     The steps should be sorted by step_number, and the array
     should be empty if there are no steps for the scheme:
@@ -126,12 +154,34 @@ function findSteps(scheme_id) { // EXERCISE C
 }
 
 function add(scheme) { // EXERCISE D
+   return db('schemes').insert(scheme)
+  .then(([scheme_id]) => {
+    return db('schemes').where('scheme_id', scheme_id).first()
+  })
+
+  
   /*
+  INSERT INTO 
+ schemes (scheme_name)
+ VALUES
+ ('myAnswer')
+
     1D- This function creates a new scheme and resolves to _the newly created scheme_.
   */
 }
 
 function addStep(scheme_id, step) { // EXERCISE E
+  return db('steps').insert({
+    ...step,
+    scheme_id
+  })
+  .then(() => {
+    return db('steps')
+    .join('schemes', 'schemes.scheme_id', 'steps.scheme_id')
+    .select('step_id', 'step_number', 'instructions', 'scheme_name')
+    .orderBy('step_number', 'asc')
+    .where('schemes.scheme_id', scheme_id)
+  })
   /*
     1E- This function adds a step to the scheme with the given `scheme_id`
     and resolves to _all the steps_ belonging to the given `scheme_id`,
